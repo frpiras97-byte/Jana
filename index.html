@@ -565,99 +565,86 @@ function buildFireworks(wrap, yr, idx){
   var step = 0;
   var W = Math.min(320, (window.innerWidth||400) - 60);
   var H = 200;
+
   var cvs = document.createElement("canvas");
   cvs.width = W; cvs.height = H;
   cvs.style.cssText = "border-radius:12px;background:#0d0020;cursor:pointer;display:block;touch-action:none;max-width:100%;";
-  var hint = document.createElement("div"); hint.className="fw-hint"; hint.textContent="\u{1F386} Klik 3x op het scherm!";
-  var ctr  = document.createElement("div"); ctr.className="fw-counter";
-  ctr.innerHTML = "\u{1F449} Klik voor: <strong>Jana</strong>";
+
+  var hint = document.createElement("div"); hint.className = "fw-hint";
+  hint.textContent = "Klik 3x op het scherm!";
+  var ctr = document.createElement("div"); ctr.className = "fw-counter";
+  ctr.innerHTML = "Klik voor: <strong style=\"color:var(--pink)\">Jana</strong>";
   wrap.appendChild(cvs); wrap.appendChild(hint); wrap.appendChild(ctr);
 
   var ctx = cvs.getContext("2d");
   var particles = [];
-  var colors = ["#ff6b9d","#ffd93d","#74c7f0","#6bffb8","#ff9a3c","#c084fc","#ffffff"];
-
-  // draw idle sparkles
-  var idle = setInterval(function(){
-    if(step >= sequence.length) return;
-    ctx.fillStyle = "rgba(13,0,32,0.3)";
-    ctx.fillRect(0,0,W,H);
-    // random small sparks
-    for(var k=0;k<3;k++){
-      var sx=Math.random()*W, sy=Math.random()*H;
-      ctx.beginPath();
-      ctx.arc(sx,sy,1+Math.random()*1.5,0,Math.PI*2);
-      ctx.fillStyle=colors[~~(Math.random()*colors.length)];
-      ctx.globalAlpha=Math.random()*0.5;
-      ctx.fill();
-      ctx.globalAlpha=1;
-    }
-  }, 100);
+  var colors = ["#ff6b9d","#ffd93d","#74c7f0","#6bffb8","#ff9a3c","#c084fc","#fff"];
+  var running = true;
+  var rafId;
 
   function launch(x, y){
     if(step >= sequence.length) return;
-    var word = sequence[step];
-    step++;
-    // update hint
+    var word = sequence[step]; step++;
     if(step < sequence.length){
-      ctr.innerHTML = "\u{1F449} Volgende: <strong>"+sequence[step]+"</strong>";
+      ctr.innerHTML = "Klik voor: <strong style=\"color:var(--pink)\">"
+        + sequence[step] + "</strong>";
     } else {
-      ctr.innerHTML = "\u{1F389} Alle drie afgevuurd!";
+      ctr.innerHTML = "\u{1F389} Alle drie!";
     }
-    // spawn burst
     var col = colors[~~(Math.random()*colors.length)];
-    for(var k=0;k<55;k++){
-      var a = Math.random()*Math.PI*2;
-      var sp = 1 + Math.random()*5;
+    for(var k = 0; k < 60; k++){
+      var a = Math.random()*Math.PI*2, sp = 1+Math.random()*5;
       particles.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
-        color:col, alpha:1, r:1.5+Math.random()*3.5, txt:null});
+        c:col, alpha:1, r:1.5+Math.random()*4, txt:null});
     }
-    // floating word
-    particles.push({x:x, y:y, vx:(Math.random()-.5)*0.4, vy:-2,
-      color:"#ffffff", alpha:1, r:0, txt:word, fs:26+~~(Math.random()*10)});
-
+    particles.push({x:x, y:y-10, vx:0, vy:-1.5,
+      c:"#fff", alpha:1, r:0, txt:word, fs:30});
     if(step >= sequence.length){
-      clearInterval(idle);
-      setTimeout(function(){ onWin(idx); }, 1400);
+      running = false;
+      setTimeout(function(){ onWin(idx); }, 1500);
     }
   }
 
   function tick(){
-    ctx.fillStyle = "rgba(13,0,32,0.18)";
-    ctx.fillRect(0,0,W,H);
-    for(var k=particles.length-1;k>=0;k--){
-      var p=particles[k];
-      p.x+=p.vx; p.y+=p.vy;
-      if(p.txt){ p.vy+=0.03; p.alpha-=0.007; }
-      else { p.vy+=0.09; p.alpha-=0.02; p.vx*=0.97; }
-      if(p.alpha<=0){ particles.splice(k,1); continue; }
-      ctx.save(); ctx.globalAlpha=p.alpha;
+    ctx.fillStyle = "rgba(13,0,32,0.2)";
+    ctx.fillRect(0, 0, W, H);
+    for(var k = particles.length-1; k >= 0; k--){
+      var p = particles[k];
+      p.x += p.vx; p.y += p.vy;
+      if(p.txt){ p.vy += 0.04; p.alpha -= 0.006; }
+      else      { p.vy += 0.1;  p.alpha -= 0.022; p.vx *= 0.97; }
+      if(p.alpha <= 0){ particles.splice(k,1); continue; }
+      ctx.save(); ctx.globalAlpha = Math.max(0,p.alpha);
       if(p.txt){
-        ctx.font = "bold "+p.fs+"px 'Caveat', cursive";
+        ctx.font = "bold " + p.fs + "px Caveat,cursive";
         ctx.textAlign = "center";
+        ctx.shadowColor = p.c; ctx.shadowBlur = 16;
         ctx.fillStyle = "#ffffff";
-        ctx.shadowColor = p.color; ctx.shadowBlur = 14;
         ctx.fillText(p.txt, p.x, p.y);
       } else {
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-        ctx.fillStyle = p.color; ctx.fill();
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
       }
       ctx.restore();
     }
-    if(step < sequence.length || particles.length > 0){
-      fwInterval = requestAnimationFrame(tick);
+    if(running || particles.length > 0){
+      rafId = requestAnimationFrame(tick);
     }
   }
-  fwInterval = requestAnimationFrame(tick);
+  rafId = requestAnimationFrame(tick);
+  fwInterval = rafId;
 
   function handleClick(e){
+    e.preventDefault();
     var r = cvs.getBoundingClientRect();
-    var cx = (e.touches?e.touches[0].clientX:e.clientX) - r.left;
-    var cy = (e.touches?e.touches[0].clientY:e.clientY) - r.top;
-    launch(cx, cy);
+    var px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+    var py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+    launch(px, py);
+    rafId = requestAnimationFrame(tick);
+    fwInterval = rafId;
   }
   cvs.addEventListener("click", handleClick);
-  cvs.addEventListener("touchstart", function(e){ e.preventDefault(); handleClick(e); }, {passive:false});
+  cvs.addEventListener("touchstart", handleClick, {passive:false});
 }
 
 // WIN — unlock all memories of this year at once
