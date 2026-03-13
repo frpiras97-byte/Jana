@@ -243,7 +243,7 @@ var YEARS = [
   { id:0, color:"#ff6b9d", year:"2019", game:"puzzle", puzzlePhoto:PUZZLE_1,
     memories:[
       { date:"13 juli 2019", title:"Onze eerste familiefoto met Nala \u{1F9B6}",
-        desc:"\u2702\ufe0f Beschrijving 2019.",
+        desc:"Nala approved. \u2764\ufe0f\u200d\ud83d\udd25",
         cap:"Nala, jij & ik \u{1F43E}", media:PHOTO_1, video:false }
     ]
   },
@@ -495,44 +495,67 @@ function makeDraggable(el, container, pieces, size, tw, th, cols, idx){
 // SLOTS
 function buildSlots(wrap, yr, idx){
   var syms = yr.slotSymbols||["\u{1F49B}","\u{1F338}","\u2B50","\u{1F388}","\u{1F496}","\u{1F308}"];
-  var attempts=0, maxAtt=10, spinning=false, reels=[], inners=[];
+  var attempts=0, maxAtt=10, isSpinning=false;
+  var displays = []; // holds the 3 display <div> elements
+
   var machine = document.createElement("div"); machine.className = "slot-machine";
   for(var i=0;i<3;i++){
     var reel = document.createElement("div"); reel.className = "reel";
-    var inner = document.createElement("div"); inner.className = "reel-inner";
-    for(var j=0;j<14;j++){ var s=document.createElement("span"); s.textContent=syms[j%syms.length]; inner.appendChild(s); }
-    reel.appendChild(inner); machine.appendChild(reel);
-    reels.push({inner:inner,val:null}); inners.push(inner);
+    reel.style.cssText = "width:80px;height:80px;border:2.5px solid #e0d8d0;border-radius:10px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:2.4rem;overflow:hidden;";
+    var disp = document.createElement("div");
+    disp.style.cssText = "font-size:2.4rem;line-height:1;text-align:center;width:100%;";
+    disp.textContent = syms[i % syms.length];
+    reel.appendChild(disp);
+    machine.appendChild(reel);
+    displays.push(disp);
   }
+
   var btn = document.createElement("button"); btn.className = "slot-btn"; btn.textContent = "\u{1F3B0} Draaien!";
   var result = document.createElement("div"); result.className = "slot-result";
   var attEl = document.createElement("div"); attEl.className = "slot-attempts"; attEl.textContent = "Je hebt "+maxAtt+" kansen";
+
   btn.onclick = function(){
-    if(spinning) return; spinning=true; btn.disabled=true; result.textContent="";
+    if(isSpinning) return;
+    isSpinning = true; btn.disabled = true; result.textContent = "";
     attempts++;
-    var chosen=[];
-    for(var i=0;i<3;i++){ var v=attempts>=maxAtt?syms[0]:syms[~~(Math.random()*syms.length)]; reels[i].val=v; chosen.push(v); }
-    if(attempts>=maxAtt) chosen[0]=chosen[1]=chosen[2]=syms[0];
-    inners.forEach(function(inner,i){
+
+    // choose final values
+    var chosen = [];
+    for(var i=0;i<3;i++){
+      chosen.push(attempts >= maxAtt ? syms[0] : syms[~~(Math.random()*syms.length)]);
+    }
+    if(attempts >= maxAtt){ chosen[0]=chosen[1]=chosen[2]=syms[0]; }
+
+    // spin each reel: rapid cycling then snap to result
+    var spinDurations = [600, 900, 1200]; // ms each reel spins
+    displays.forEach(function(disp, ri){
+      var spinInterval = setInterval(function(){
+        disp.textContent = syms[~~(Math.random()*syms.length)];
+      }, 80);
+
       setTimeout(function(){
-        inner.style.transition="none"; inner.style.transform="translateY(0)";
-        setTimeout(function(){
-          inner.style.transition="transform 0.55s cubic-bezier(.25,.46,.45,.94)";
-          inner.style.transform="translateY(-"+(9*80)+"px)";
-          setTimeout(function(){
-            inner.style.transition="none"; inner.innerHTML="";
-            for(var j=0;j<14;j++){ var s=document.createElement("span"); s.textContent=j===5?reels[i].val:syms[j%syms.length]; inner.appendChild(s); }
-            inner.style.transform="translateY(-"+(5*80)+"px)";
-            if(i===2){
-              var win = chosen[0]===chosen[1]&&chosen[1]===chosen[2];
-              if(win){ result.textContent="\u{1F38A} JACKPOT! "+chosen.join("")+" \u{1F38A}"; result.style.color="var(--green)"; boom(38); setTimeout(function(){ onWin(idx); }, 800); }
-              else{ spinning=false; btn.disabled=false; result.textContent="Bijna! "+(maxAtt-attempts)+" kansen \u{1F604}"; result.style.color="var(--orange)"; attEl.textContent="Poging "+attempts+" / "+maxAtt; }
-            }
-          },650);
-        },30);
-      },i*180);
+        clearInterval(spinInterval);
+        disp.textContent = chosen[ri];
+        // last reel done -> check result
+        if(ri === 2){
+          var win = chosen[0]===chosen[1] && chosen[1]===chosen[2];
+          if(win){
+            result.textContent = "\u{1F38A} JACKPOT! "+chosen.join("")+" \u{1F38A}";
+            result.style.color = "var(--green)";
+            boom(38);
+            setTimeout(function(){ onWin(idx); }, 800);
+          } else {
+            isSpinning = false; btn.disabled = false;
+            var left = maxAtt - attempts;
+            result.textContent = left > 0 ? "Bijna! Nog "+left+" kansen \u{1F604}" : "";
+            result.style.color = "var(--orange)";
+            attEl.textContent = "Poging "+attempts+" / "+maxAtt;
+          }
+        }
+      }, spinDurations[ri]);
     });
   };
+
   wrap.appendChild(machine); wrap.appendChild(btn); wrap.appendChild(result); wrap.appendChild(attEl);
 }
 
@@ -540,65 +563,106 @@ function buildSlots(wrap, yr, idx){
 function buildFireworks(wrap, yr, idx){
   var sequence = ["Jana","Francesco","\u2764\ufe0f"];
   var step = 0;
-  var cvs = document.createElement("canvas"); cvs.className="fw-canvas";
-  cvs.width = Math.min(340, window.innerWidth - 60); cvs.height = 200;
-  var hint = document.createElement("div"); hint.className="fw-hint"; hint.textContent="Klik op het scherm!";
-  var ctr = document.createElement("div"); ctr.className="fw-counter";
-  ctr.innerHTML = "Klik "+sequence.length+" keer: <strong>Jana</strong> &rarr; Francesco &rarr; \u2764\ufe0f";
+  var W = Math.min(320, (window.innerWidth||400) - 60);
+  var H = 200;
+  var cvs = document.createElement("canvas");
+  cvs.width = W; cvs.height = H;
+  cvs.style.cssText = "border-radius:12px;background:#0d0020;cursor:pointer;display:block;touch-action:none;max-width:100%;";
+  var hint = document.createElement("div"); hint.className="fw-hint"; hint.textContent="\u{1F386} Klik 3x op het scherm!";
+  var ctr  = document.createElement("div"); ctr.className="fw-counter";
+  ctr.innerHTML = "\u{1F449} Klik voor: <strong>Jana</strong>";
   wrap.appendChild(cvs); wrap.appendChild(hint); wrap.appendChild(ctr);
+
   var ctx = cvs.getContext("2d");
   var particles = [];
-  var cols = ["#ff6b9d","#ffd93d","#74c7f0","#6bffb8","#ff9a3c","#c084fc","#ffffff"];
+  var colors = ["#ff6b9d","#ffd93d","#74c7f0","#6bffb8","#ff9a3c","#c084fc","#ffffff"];
+
+  // draw idle sparkles
+  var idle = setInterval(function(){
+    if(step >= sequence.length) return;
+    ctx.fillStyle = "rgba(13,0,32,0.3)";
+    ctx.fillRect(0,0,W,H);
+    // random small sparks
+    for(var k=0;k<3;k++){
+      var sx=Math.random()*W, sy=Math.random()*H;
+      ctx.beginPath();
+      ctx.arc(sx,sy,1+Math.random()*1.5,0,Math.PI*2);
+      ctx.fillStyle=colors[~~(Math.random()*colors.length)];
+      ctx.globalAlpha=Math.random()*0.5;
+      ctx.fill();
+      ctx.globalAlpha=1;
+    }
+  }, 100);
 
   function launch(x, y){
     if(step >= sequence.length) return;
-    var word = sequence[step]; step++;
-    // update counter
-    var remaining = sequence.slice(step);
+    var word = sequence[step];
+    step++;
+    // update hint
     if(step < sequence.length){
-      ctr.innerHTML = "Volgende: <strong>"+sequence[step]+"</strong>";
+      ctr.innerHTML = "\u{1F449} Volgende: <strong>"+sequence[step]+"</strong>";
     } else {
-      ctr.innerHTML = "\u{1F389} Alle drie!";
+      ctr.innerHTML = "\u{1F389} Alle drie afgevuurd!";
     }
-    // explode particles
-    var col = cols[~~(Math.random()*cols.length)];
-    for(var i=0;i<50;i++){
-      var a=Math.random()*Math.PI*2, sp=1.2+Math.random()*4;
-      particles.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,c:col,alpha:1,r:2+Math.random()*4,txt:null});
+    // spawn burst
+    var col = colors[~~(Math.random()*colors.length)];
+    for(var k=0;k<55;k++){
+      var a = Math.random()*Math.PI*2;
+      var sp = 1 + Math.random()*5;
+      particles.push({x:x,y:y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+        color:col, alpha:1, r:1.5+Math.random()*3.5, txt:null});
     }
-    // floating text
-    particles.push({x:x,y:y,vx:(Math.random()-.5)*0.5,vy:-1.8,c:"#fff",alpha:1,r:0,txt:word,size:28+Math.floor(Math.random()*14)});
-    if(step >= sequence.length) setTimeout(function(){ onWin(idx); }, 1200);
+    // floating word
+    particles.push({x:x, y:y, vx:(Math.random()-.5)*0.4, vy:-2,
+      color:"#ffffff", alpha:1, r:0, txt:word, fs:26+~~(Math.random()*10)});
+
+    if(step >= sequence.length){
+      clearInterval(idle);
+      setTimeout(function(){ onWin(idx); }, 1400);
+    }
   }
 
-  cvs.onclick = function(e){ var r=cvs.getBoundingClientRect(); launch(e.clientX-r.left, e.clientY-r.top); };
-  cvs.ontouchstart = function(e){ e.preventDefault(); var r=cvs.getBoundingClientRect(); launch(e.touches[0].clientX-r.left, e.touches[0].clientY-r.top); };
-
-  fwInterval = setInterval(function(){
-    ctx.fillStyle="rgba(26,10,46,0.18)"; ctx.fillRect(0,0,cvs.width,cvs.height);
-    particles = particles.filter(function(p){
-      p.x+=p.vx; p.y+=p.vy; p.alpha-=p.txt?0.008:0.018; p.vy+=p.txt?0.02:0.07; p.vx*=0.98;
-      if(p.alpha<=0) return false;
+  function tick(){
+    ctx.fillStyle = "rgba(13,0,32,0.18)";
+    ctx.fillRect(0,0,W,H);
+    for(var k=particles.length-1;k>=0;k--){
+      var p=particles[k];
+      p.x+=p.vx; p.y+=p.vy;
+      if(p.txt){ p.vy+=0.03; p.alpha-=0.007; }
+      else { p.vy+=0.09; p.alpha-=0.02; p.vx*=0.97; }
+      if(p.alpha<=0){ particles.splice(k,1); continue; }
       ctx.save(); ctx.globalAlpha=p.alpha;
       if(p.txt){
-        ctx.font="bold "+p.size+"px Caveat, cursive";
-        ctx.fillStyle="#fff";
-        ctx.textAlign="center";
-        ctx.shadowColor=p.c; ctx.shadowBlur=12;
+        ctx.font = "bold "+p.fs+"px 'Caveat', cursive";
+        ctx.textAlign = "center";
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = p.color; ctx.shadowBlur = 14;
         ctx.fillText(p.txt, p.x, p.y);
       } else {
-        ctx.fillStyle=p.c;
-        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fillStyle = p.color; ctx.fill();
       }
       ctx.restore();
-      return true;
-    });
-  },16);
+    }
+    if(step < sequence.length || particles.length > 0){
+      fwInterval = requestAnimationFrame(tick);
+    }
+  }
+  fwInterval = requestAnimationFrame(tick);
+
+  function handleClick(e){
+    var r = cvs.getBoundingClientRect();
+    var cx = (e.touches?e.touches[0].clientX:e.clientX) - r.left;
+    var cy = (e.touches?e.touches[0].clientY:e.clientY) - r.top;
+    launch(cx, cy);
+  }
+  cvs.addEventListener("click", handleClick);
+  cvs.addEventListener("touchstart", function(e){ e.preventDefault(); handleClick(e); }, {passive:false});
 }
 
 // WIN — unlock all memories of this year at once
 function onWin(idx){
-  if(fwInterval){ clearInterval(fwInterval); fwInterval=null; }
+  if(fwInterval){ cancelAnimationFrame(fwInterval); fwInterval=null; }
   done[idx] = true;
   var yr = YEARS[idx];
   var firstMem = yr.memories[0];
