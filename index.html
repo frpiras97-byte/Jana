@@ -57,6 +57,7 @@ canvas#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:non
 /* POLAROID */
 .polaroid{background:var(--white);border-radius:3px;padding:11px 11px 50px;box-shadow:0 8px 28px rgba(0,0,0,.14);width:210px;flex-shrink:0;position:relative;transition:opacity .5s,transform .5s,width .4s;}
 .polaroid.revealed{width:240px;}
+.polaroid.revealed::after{content:"\00A0\1F441\FE0F";position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:.7rem;color:#bbb;font-family:'Nunito',sans-serif;letter-spacing:.05em;}
 .pol-photo{width:100%;aspect-ratio:4/5;background:#f0e8e0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;overflow:hidden;}
 .pol-photo.locked{aspect-ratio:1;background:linear-gradient(135deg,#ffe0ef,#fff8d0,#d0f0ff);}
 .pol-lock-icon{font-size:2rem;animation:wig 2s ease-in-out infinite;}
@@ -373,6 +374,17 @@ function buildPages(){
     sec.appendChild(body);
     c.appendChild(sec);
   });
+  // re-attach click handlers for already-unlocked years (e.g. after page reload)
+  YEARS.forEach(function(yr, i){
+    if(done[i]){
+      var pol = document.getElementById("pol-"+i);
+      if(pol){
+        pol.style.cursor="pointer";
+        pol.title="Klik om te bekijken";
+        (function(ii){ pol.onclick = function(){ showReveal(ii); }; })(i);
+      }
+    }
+  });
 }
 
 // BUILD GAME
@@ -668,7 +680,12 @@ function onWin(idx){
   if(pd){ pd.style.display="block"; pd.textContent=yr.memories.length>1?yr.year+" \u00b7 "+yr.memories.length+" foto's":firstMem.date; }
   if(pt2){ pt2.style.display="block"; pt2.textContent=yr.memories.length>1?firstMem.title+" & meer...":firstMem.title; }
   if(pc){ pc.className="pol-cap"; pc.textContent=firstMem.cap; }
-  if(pol){ pol.style.opacity="1"; pol.classList.add("revealed"); }
+  if(pol){
+    pol.style.opacity="1"; pol.classList.add("revealed");
+    pol.style.cursor="pointer";
+    pol.title="Klik om te bekijken";
+    (function(i){ pol.onclick = function(){ showReveal(i); }; })(idx);
+  }
   // update game wrap
   var gw = document.getElementById("gw-"+idx);
   if(gw) gw.innerHTML='<div style="font-family:Caveat,cursive;font-size:1.9rem;font-weight:700;color:var(--green);text-align:center;">\u{1F389} '+yr.year+' ontgrendeld!</div>';
